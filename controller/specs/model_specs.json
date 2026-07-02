@@ -1,0 +1,35 @@
+{
+  "version": "2026-07-01",
+  "models": {
+    "EC_SAMPLE_A": {
+      "model_code": "EC_SAMPLE_A",
+      "description": "示例机型A，请替换为实际规格",
+      "cpu_match_rule": {
+        "match_type": "contains_any",
+        "keywords": [
+          "Intel(R) Core(TM) i5",
+          "Intel(R) Xeon"
+        ]
+      },
+      "memory_expected_gb": 16,
+      "memory_min_gb": 16,
+      "disk_model_keywords": [
+        "KINGSTON",
+        "WDC",
+        "SAMSUNG"
+      ],
+      "disk_min_capacity_gb": 256,
+      "burnin_profile": {
+        "name": "24h_standard",
+        "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
+        "duration_minutes": 1440,
+        "serial_ports_expected": [
+          "COM1",
+          "COM2",
+          "COM3",
+          "COM4"
+        ]
+      }
+    }
+  }
+}

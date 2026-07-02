@@ -1,0 +1,18 @@
+{
+  "version": "2026-07-01",
+  "rules": [
+    {
+      "model_code": "EC_SAMPLE_A",
+      "match": {
+        "product_name_contains": [
+          "IPC-A",
+          "EC-A"
+        ],
+        "baseboard_contains": [
+          "Board-A"
+        ],
+        "serial_contains": []
+      }
+    }
+  ]
+}

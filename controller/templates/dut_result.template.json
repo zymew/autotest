@@ -1,0 +1,57 @@
+{
+  "sn": "SYSTEM-SN-001",
+  "model_code": "EC_SAMPLE_A",
+  "hardware_identity": {
+    "bios_serial_number": "SYSTEM-SN-001",
+    "product_name": "IPC-A",
+    "manufacturer": "Vendor Name",
+    "baseboard_product": "Board-A",
+    "baseboard_serial": "BOARD-SN-001"
+  },
+  "hardware_check_result": {
+    "cpu": {
+      "detected_name": "Intel(R) Core(TM) i5-1235U",
+      "status": "PASS",
+      "health_status": "OK",
+      "matches_spec": true
+    },
+    "memory": {
+      "total_gb": 16.0,
+      "module_count": 2,
+      "status": "PASS",
+      "health_status": "OK",
+      "matches_spec": true
+    },
+    "disk": {
+      "drives": [
+        {
+          "model": "KINGSTON OM8SEP4256Q-A0",
+          "size_gb": 238.5,
+          "status": "OK"
+        }
+      ],
+      "status": "PASS",
+      "health_status": "UNKNOWN_OR_OK",
+      "matches_spec": true
+    },
+    "overall_match": true
+  },
+  "burnin_started": true,
+  "burnin_profile": {
+    "name": "24h_standard",
+    "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
+    "duration_minutes": 1440
+  },
+  "burnin_result": {
+    "status": "PASS",
+    "detail": "BurnInTest passed"
+  },
+  "overall_result": "PASS",
+  "failure_reason": "",
+  "result_upload": {
+    "status": "SUCCESS",
+    "detail": "Uploaded to controller"
+  },
+  "start_time": "2026-07-01T09:00:00",
+  "end_time": "2026-07-02T09:00:00"
+}

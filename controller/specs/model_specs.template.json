@@ -1,0 +1,66 @@
+{
+  "version": "2026-07-01",
+  "models": {
+    "EC_SAMPLE_A": {
+      "model_code": "EC_SAMPLE_A",
+      "description": "示例机型A",
+      "cpu_match_rule": {
+        "match_type": "contains_any",
+        "keywords": [
+          "Intel(R) Core(TM) i5",
+          "Intel(R) Xeon"
+        ]
+      },
+      "memory_expected_gb": 16,
+      "memory_min_gb": 16,
+      "disk_model_keywords": [
+        "KINGSTON",
+        "WDC",
+        "SAMSUNG"
+      ],
+      "disk_min_capacity_gb": 256,
+      "burnin_profile": {
+        "name": "24h_standard",
+        "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
+        "duration_minutes": 1440,
+        "serial_ports_expected": [
+          "COM1",
+          "COM2",
+          "COM3",
+          "COM4"
+        ]
+      }
+    },
+    "EC_SAMPLE_B": {
+      "model_code": "EC_SAMPLE_B",
+      "description": "示例机型B",
+      "cpu_match_rule": {
+        "match_type": "contains_any",
+        "keywords": [
+          "Intel(R) Core(TM) i7",
+          "AMD Ryzen"
+        ]
+      },
+      "memory_expected_gb": 32,
+      "memory_min_gb": 32,
+      "disk_model_keywords": [
+        "SAMSUNG",
+        "MICRON"
+      ],
+      "disk_min_capacity_gb": 512,
+      "burnin_profile": {
+        "name": "48h_high_spec",
+        "cfg_file": "bit_EC_SAMPLE_B_2880.bitcfg",
+        "duration_minutes": 2880,
+        "serial_ports_expected": [
+          "COM1",
+          "COM2",
+          "COM3",
+          "COM4",
+          "COM5",
+          "COM6"
+        ]
+      }
+    }
+  }
+}
