@@ -1,4 +1,6 @@
 {
+  "task_id": "123456abcdef",
+  "station_id": "LINE-A-01",
   "sn": "SYSTEM-SN-001",
   "model_code": "EC_SAMPLE_A",
   "hardware_identity": {
@@ -8,50 +10,54 @@
     "baseboard_product": "Board-A",
     "baseboard_serial": "BOARD-SN-001"
   },
-  "hardware_check_result": {
-    "cpu": {
-      "detected_name": "Intel(R) Core(TM) i5-1235U",
+  "test_results": {
+    "inventory_check": {
       "status": "PASS",
-      "health_status": "OK",
-      "matches_spec": true
-    },
-    "memory": {
-      "total_gb": 16.0,
-      "module_count": 2,
-      "status": "PASS",
-      "health_status": "OK",
-      "matches_spec": true
-    },
-    "disk": {
-      "drives": [
-        {
-          "model": "KINGSTON OM8SEP4256Q-A0",
-          "size_gb": 238.5,
-          "status": "OK"
+      "payload": {
+        "hardware_check_result": {
+          "overall_match": true
         }
-      ],
-      "status": "PASS",
-      "health_status": "UNKNOWN_OR_OK",
-      "matches_spec": true
+      }
     },
-    "overall_match": true
-  },
-  "burnin_started": true,
-  "burnin_profile": {
-    "name": "24h_standard",
-    "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
-    "duration_minutes": 1440
-  },
-  "burnin_result": {
-    "status": "PASS",
-    "detail": "BurnInTest passed"
+    "lan_check": {
+      "status": "PASS",
+      "payload": {
+        "min_speed_mbps": 1000
+      }
+    },
+    "serial_loopback_check": {
+      "status": "PASS",
+      "payload": {
+        "required_ports": 2
+      }
+    },
+    "usb_check": {
+      "status": "SKIP",
+      "payload": {
+        "detail": "reserved for fixture integration"
+      }
+    },
+    "display_check": {
+      "status": "SKIP",
+      "payload": {
+        "detail": "reserved for fixture integration"
+      }
+    },
+    "io_check": {
+      "status": "SKIP",
+      "payload": {
+        "detail": "reserved for fixture integration"
+      }
+    },
+    "burnin_check": {
+      "status": "PASS",
+      "payload": {
+        "detail": "BurnInTest passed (1440 min)"
+      }
+    }
   },
   "overall_result": "PASS",
   "failure_reason": "",
-  "result_upload": {
-    "status": "SUCCESS",
-    "detail": "Uploaded to controller"
-  },
-  "start_time": "2026-07-01T09:00:00",
-  "end_time": "2026-07-02T09:00:00"
+  "started_at": "2026-07-03T09:00:00",
+  "ended_at": "2026-07-04T09:00:00"
 }
