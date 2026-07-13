@@ -1,9 +1,60 @@
 {
-  "version": "2026-07-01",
+  "version": "2026-07-03",
+  "defaults": {
+    "description": "默认产线测试策略",
+    "lan_check": {
+      "required_linked_ports": 1,
+      "min_speed_mbps": 1000
+    },
+    "serial_loopback_check": {
+      "required_ports": 1,
+      "baudrate": 115200,
+      "timeout_seconds": 2,
+      "loopback_payload": "FACTORY_LOOPBACK"
+    },
+    "burnin_profile": {
+      "name": "24h_standard",
+      "cfg_file": "bit_default_1440.bitcfg",
+      "duration_minutes": 1440
+    },
+    "test_items": {
+      "inventory_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "lan_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "serial_loopback_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "usb_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "display_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "io_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "burnin_check": {
+        "enabled": true,
+        "blocking": true
+      }
+    }
+  },
   "models": {
     "EC_SAMPLE_A": {
       "model_code": "EC_SAMPLE_A",
-      "description": "示例机型A，请替换为实际规格",
+      "description": "示例机型A，请替换为实际产线配置",
       "cpu_match_rule": {
         "match_type": "contains_any",
         "keywords": [
@@ -13,22 +64,30 @@
       },
       "memory_expected_gb": 16,
       "memory_min_gb": 16,
+      "memory_vendor_keywords": [
+        "KINGSTON",
+        "SAMSUNG"
+      ],
       "disk_model_keywords": [
         "KINGSTON",
         "WDC",
         "SAMSUNG"
       ],
       "disk_min_capacity_gb": 256,
+      "lan_check": {
+        "required_linked_ports": 1,
+        "min_speed_mbps": 1000
+      },
+      "serial_loopback_check": {
+        "required_ports": 2,
+        "baudrate": 115200,
+        "timeout_seconds": 2,
+        "loopback_payload": "EC_SAMPLE_A_LOOP"
+      },
       "burnin_profile": {
         "name": "24h_standard",
         "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
-        "duration_minutes": 1440,
-        "serial_ports_expected": [
-          "COM1",
-          "COM2",
-          "COM3",
-          "COM4"
-        ]
+        "duration_minutes": 1440
       }
     }
   }

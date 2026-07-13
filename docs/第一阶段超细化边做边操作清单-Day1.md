@@ -228,7 +228,7 @@ sudo nano /etc/dnsmasq.conf
 interface=enp1s0
 bind-interfaces
 
-dhcp-range=192.168.20.100,192.168.20.200,10m
+dhcp-range=192.168.10.100,192.168.10.200,10m
 dhcp-option=3
 dhcp-option=6
 
@@ -448,6 +448,7 @@ curl http://192.168.10.1:8080/healthz
 `实现什么结果`
 
 - 控制机基础环境完成，下一步就可以做 WinPE 和 PXE 文件准备
+- 但此时还没有实际准备 `ipxe.efi`、`wimboot`、`boot.wim`
 
 打勾：
 

@@ -1,5 +1,56 @@
 {
-  "version": "2026-07-01",
+  "version": "2026-07-03",
+  "defaults": {
+    "description": "默认产线测试策略",
+    "lan_check": {
+      "required_linked_ports": 1,
+      "min_speed_mbps": 1000
+    },
+    "serial_loopback_check": {
+      "required_ports": 1,
+      "baudrate": 115200,
+      "timeout_seconds": 2,
+      "loopback_payload": "FACTORY_LOOPBACK"
+    },
+    "burnin_profile": {
+      "name": "24h_standard",
+      "cfg_file": "bit_default_1440.bitcfg",
+      "duration_minutes": 1440
+    },
+    "test_items": {
+      "inventory_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "lan_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "serial_loopback_check": {
+        "enabled": true,
+        "blocking": true
+      },
+      "usb_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "display_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "io_check": {
+        "enabled": false,
+        "blocking": false,
+        "placeholder_only": true
+      },
+      "burnin_check": {
+        "enabled": true,
+        "blocking": true
+      }
+    }
+  },
   "models": {
     "EC_SAMPLE_A": {
       "model_code": "EC_SAMPLE_A",
@@ -13,22 +64,30 @@
       },
       "memory_expected_gb": 16,
       "memory_min_gb": 16,
+      "memory_vendor_keywords": [
+        "KINGSTON",
+        "SAMSUNG"
+      ],
       "disk_model_keywords": [
         "KINGSTON",
         "WDC",
         "SAMSUNG"
       ],
       "disk_min_capacity_gb": 256,
+      "lan_check": {
+        "required_linked_ports": 1,
+        "min_speed_mbps": 1000
+      },
+      "serial_loopback_check": {
+        "required_ports": 2,
+        "baudrate": 115200,
+        "timeout_seconds": 2,
+        "loopback_payload": "EC_SAMPLE_A_LOOP"
+      },
       "burnin_profile": {
         "name": "24h_standard",
         "cfg_file": "bit_EC_SAMPLE_A_1440.bitcfg",
-        "duration_minutes": 1440,
-        "serial_ports_expected": [
-          "COM1",
-          "COM2",
-          "COM3",
-          "COM4"
-        ]
+        "duration_minutes": 1440
       }
     },
     "EC_SAMPLE_B": {
@@ -38,28 +97,34 @@
         "match_type": "contains_any",
         "keywords": [
           "Intel(R) Core(TM) i7",
-          "AMD Ryzen"
+          "Intel(R) Xeon"
         ]
       },
       "memory_expected_gb": 32,
       "memory_min_gb": 32,
-      "disk_model_keywords": [
+      "memory_vendor_keywords": [
         "SAMSUNG",
         "MICRON"
       ],
+      "disk_model_keywords": [
+        "SAMSUNG",
+        "WDC"
+      ],
       "disk_min_capacity_gb": 512,
+      "lan_check": {
+        "required_linked_ports": 2,
+        "min_speed_mbps": 1000
+      },
+      "serial_loopback_check": {
+        "required_ports": 4,
+        "baudrate": 115200,
+        "timeout_seconds": 2,
+        "loopback_payload": "EC_SAMPLE_B_LOOP"
+      },
       "burnin_profile": {
-        "name": "48h_high_spec",
+        "name": "48h_extended",
         "cfg_file": "bit_EC_SAMPLE_B_2880.bitcfg",
-        "duration_minutes": 2880,
-        "serial_ports_expected": [
-          "COM1",
-          "COM2",
-          "COM3",
-          "COM4",
-          "COM5",
-          "COM6"
-        ]
+        "duration_minutes": 2880
       }
     }
   }
