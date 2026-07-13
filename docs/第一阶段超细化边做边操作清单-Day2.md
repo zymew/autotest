@@ -1,523 +1,477 @@
 # 第一阶段超细化边做边操作清单 Day 2
 
-这份 Day2 清单已经按新的项目状态重写了。  
-它不再要求你今天就把整个产线方案做完，而是只做最有价值的事情：
-
-- 把新版控制机服务部署起来
-- 把新版 WinPE 脚本带进去
-- 让 1 台 DUT 开始和控制机“说上话”
-
-今天做完以后，最理想的结果是：
-
-1. 控制机能跑新版服务
-2. 你能打开 `/dashboard`
-3. WinPE 已经带上新版 agent
-4. 至少 1 台 DUT 能进 WinPE
-5. DUT 开始向控制机注册任务或开始回传事件
+> 本文件是 Day2 存档版。
+>
+> Day2 的目标不是完成全部产线测试，而是打通：
+>
+> DUT -> PXE -> iPXE -> WinPE -> Python Agent -> 控制机 -> 结果 JSON
+>
+> 截至本次存档，这条主链已经在 1 台 DUT 上跑通。Agent 已运行并生成结果，但 overall_result 为 FAIL。Dashboard 和 Trace 的端到端展示验证，以及测试项失败原因分析，留到后续阶段。
 
 ---
 
-## A. 确认今天的目标别跑偏
+## A. 明确 Day2 目标
 
-`在哪台机器`
+在哪台机器
 
 - Windows 开发机
 
-`用什么工具`
+通过的方法/步骤
 
-- 文档
+1. 只关注一条主链：
+   - DUT 能从 PXE 启动
+   - DUT 能进入 WinPE
+   - WinPE 能自动启动 Agent
+   - Agent 能联系控制机
+   - 控制机能收到结果
+2. 本日不要求完成：
+   - BurnInTest 长时间老化
+   - 第二台 DUT
+   - 多机并行
+   - MQTT/Grafana
+   - USB、显示口、IO 自动化
 
-`通过的方法/步骤`
+实现什么结果
 
-1. 先看一遍：
-   - [docs/第一阶段实操总清单.md](/C:/Users/19306/Documents/自动测试/docs/第一阶段实操总清单.md)
-   - [docs/第一阶段产线自动化重构实施说明.md](/C:/Users/19306/Documents/自动测试/docs/第一阶段产线自动化重构实施说明.md)
-2. 记住 Day2 只追求一件事：
-   - 让 `DUT -> WinPE -> Agent -> 控制机` 主链开始联调
-3. 今天先不追：
-   - MQTT 真接入
-   - Grafana
-   - USB 自动化
-   - 显示口
-   - IO
-
-`实现什么结果`
-
-- 你知道今天不是“做完整产线”，而是“开始真机联调”
+- Day2 的范围不会和完整产线目标混在一起。
 
 打勾：
 
-- [ ] 已重新明确 Day2 目标
+- [x] 已明确 Day2 只做主链联调
 
 ---
 
-## B. 检查本地仓库关键文件
+## B. 确认控制机基础服务
 
-`在哪台机器`
-
-- Windows 开发机
-
-`用什么工具`
-
-- 文件管理器
-- 文本编辑器
-
-`通过的方法/步骤`
-
-1. 确认这些文件存在：
-   - [controller/server/app.py](/C:/Users/19306/Documents/自动测试/controller/server/app.py)
-   - [controller/server/task_store.py](/C:/Users/19306/Documents/自动测试/controller/server/task_store.py)
-   - [controller/specs/model_specs.json](/C:/Users/19306/Documents/自动测试/controller/specs/model_specs.json)
-   - [winpe/scripts/agent.py](/C:/Users/19306/Documents/自动测试/winpe/scripts/agent.py)
-   - [winpe/scripts/hardware_probe.py](/C:/Users/19306/Documents/自动测试/winpe/scripts/hardware_probe.py)
-   - [winpe/scripts/spec_client.py](/C:/Users/19306/Documents/自动测试/winpe/scripts/spec_client.py)
-   - [winpe/scripts/run_bit.py](/C:/Users/19306/Documents/自动测试/winpe/scripts/run_bit.py)
-   - [winpe/scripts/startnet.cmd](/C:/Users/19306/Documents/自动测试/winpe/scripts/startnet.cmd)
-2. 只需要确认“文件都在”，暂时不深究全部代码细节
-
-`实现什么结果`
-
-- 你知道今天要部署的是哪一套新文件
-
-打勾：
-
-- [ ] 已确认控制机服务文件
-- [ ] 已确认 WinPE 脚本文件
-
----
-
-## C. 确认 Ubuntu 控制机基础服务仍正常
-
-`在哪台机器`
+在哪台机器
 
 - Ubuntu 控制机
 
-`用什么工具`
+现场固定参数
 
-- 终端
+- 测试网口：eno1
+- 控制机 IP：192.168.10.1/24
+- DHCP 地址池：192.168.10.100 到 192.168.10.200
+- Controller：前台运行的 python3 app.py
+- dnsmasq、nginx：systemd 服务
 
-`通过的方法/步骤`
+通过的方法/步骤
 
-1. 执行：
+1. 查看网口：
 
-```bash
-sudo systemctl status dnsmasq
-sudo systemctl status nginx
-curl http://192.168.10.1:8080/healthz
-```
+    ip -br link
 
-2. 确认：
-   - `dnsmasq` 是 `active (running)`
-   - `nginx` 是 `active (running)`
-   - `healthz` 能返回 `ok`
+2. 如果网口状态是 DOWN，先拉起：
 
-3. 如果 `healthz` 不通，优先确认你是否已经在控制机启动过新版 `app.py`
+    sudo ip link set eno1 up
 
-`实现什么结果`
+3. 检查 dnsmasq 和 nginx：
 
-- 控制机网络/PXE/HTTP 基础环境还在
+    sudo systemctl status dnsmasq --no-pager
+    sudo systemctl status nginx --no-pager
+
+4. Controller 进入目录并前台启动：
+
+    cd /opt/factory-sandbox/controller/server
+    python3 app.py --host 0.0.0.0 --port 8080
+
+5. 不要关闭 Controller 所在终端。另开终端验证：
+
+    curl http://192.168.10.1:8080/healthz
+    curl http://192.168.10.1:8080/api/specs/model_specs
+
+实现什么结果
+
+- dnsmasq、nginx 正常。
+- healthz 能返回 200。
+- Controller 前台窗口保持运行。
 
 打勾：
 
-- [ ] `dnsmasq` 正常
-- [ ] `nginx` 正常
-- [ ] `healthz` 正常
+- [x] dnsmasq 正常
+- [x] nginx 正常
+- [x] Controller 前台启动
+- [x] healthz 正常
 
 ---
 
-## D. 把新版 controller 目录同步到控制机
+## C. 同步新版 controller
 
-`在哪台机器`
+在哪台机器
 
 - Windows 开发机
 - Ubuntu 控制机
 
-`用什么工具`
+通过的方法/步骤
 
-- U 盘或局域网传输
-- 文件管理器
+1. 将仓库里的 controller 目录复制到 U 盘或可访问位置。
+2. 如果目标目录没有权限，先复制到 Ubuntu 用户目录，例如：
 
-`通过的方法/步骤`
+    /home/zxcc/Desktop/controller
 
-1. 从当前仓库复制整个 `controller` 目录
-2. 覆盖到 Ubuntu 控制机：
+3. 再在终端提权复制：
 
-```text
-/opt/factory-sandbox/controller
-```
+    sudo mkdir -p /opt/factory-sandbox
+    sudo cp -r ~/Desktop/controller /opt/factory-sandbox/
 
-3. 到 Ubuntu 控制机终端检查：
+4. 确认至少存在：
 
-```bash
-find /opt/factory-sandbox/controller -maxdepth 3 -type f
-```
+    /opt/factory-sandbox/controller/server/app.py
+    /opt/factory-sandbox/controller/server/task_store.py
+    /opt/factory-sandbox/controller/specs/model_specs.json
 
-4. 确认至少能看到：
-   - `server/app.py`
-   - `server/task_store.py`
-   - `specs/model_specs.json`
+5. Controller 结果目录需要由当前用户写入。如果注册时出现 Permission denied，执行：
 
-`实现什么结果`
+    sudo mkdir -p /opt/factory-sandbox/controller/results/archive
+    sudo chown -R zxcc:zxcc /opt/factory-sandbox/controller/results
 
-- 控制机拿到最新代码
+实现什么结果
+
+- 控制机拿到与仓库一致的新版 Controller。
 
 打勾：
 
-- [ ] 新版 `controller` 已同步到控制机
-- [ ] 控制机上能看到 `task_store.py`
+- [x] controller 已同步
+- [x] Controller 结果目录权限已处理
 
 ---
 
-## E. 启动新版控制机服务
+## D. 创建并挂载正式 WinPE
 
-`在哪台机器`
-
-- Ubuntu 控制机
-
-`用什么工具`
-
-- 终端
-
-`通过的方法/步骤`
-
-1. 进入目录：
-
-```bash
-cd /opt/factory-sandbox/controller/server
-```
-
-2. 启动：
-
-```bash
-python3 app.py --host 0.0.0.0 --port 8080
-```
-
-3. 保持这个终端不要关
-4. 新开一个终端验证：
-
-```bash
-curl http://192.168.10.1:8080/healthz
-curl http://192.168.10.1:8080/api/dashboard/summary
-```
-
-5. 如果环境允许，再用浏览器打开：
-
-```text
-http://192.168.10.1:8080/dashboard
-```
-
-`实现什么结果`
-
-- 控制机新版服务能启动并暴露看板/接口
-
-打勾：
-
-- [ ] 新版 `app.py` 已启动
-- [ ] `/healthz` 正常
-- [ ] `/api/dashboard/summary` 正常
-- [ ] `/dashboard` 可打开
-
----
-
-## F. 看一眼当前测试计划配置
-
-`在哪台机器`
+在哪台机器
 
 - Windows 开发机
 
-`用什么工具`
+用什么工具
 
-- 文本编辑器
-
-`通过的方法/步骤`
-
-1. 打开：
-   - [controller/specs/model_specs.json](/C:/Users/19306/Documents/自动测试/controller/specs/model_specs.json)
-2. 重点只看这几块：
-   - `defaults`
-   - `test_items`
-   - `lan_check`
-   - `serial_loopback_check`
-   - `burnin_profile`
-3. 暂时不要求你今天就把所有真实参数改完
-4. 今天的目的只是知道：
-   - 当前主线测哪些项
-   - 哪些项是占位
-
-`实现什么结果`
-
-- 你知道系统今天默认会跑什么测试
-
-打勾：
-
-- [ ] 已看过 `model_specs.json`
-- [ ] 已知道 `USB / 显示 / IO` 目前只是占位
-
----
-
-## G. 确认 WinPE 里要带哪些脚本
-
-`在哪台机器`
-
-- Windows 开发机
-
-`用什么工具`
-
-- 文件管理器
-
-`通过的方法/步骤`
-
-1. 确认 WinPE 里至少要带：
-   - `agent.py`
-   - `hardware_probe.py`
-   - `spec_client.py`
-   - `run_bit.py`
-   - `startnet.cmd`
-2. 如果你已经有现成 WinPE 工作目录，就准备把这些新版文件覆盖进去
-3. 如果你还没有现成 WinPE，就先只记住今天需要更新的是 `winpe/scripts/`
-
-`实现什么结果`
-
-- 你知道 WinPE 更新的最小范围
-
-打勾：
-
-- [ ] 已确认 WinPE 需更新的脚本清单
-
----
-
-## H. 更新 WinPE 里的脚本
-
-`在哪台机器`
-
-- Windows 开发机
-
-`用什么工具`
-
-- 文件管理器
+- Windows ADK
+- WinPE Add-on
+- Deployment and Imaging Tools Environment 管理员终端
 - DISM
-- 你当前已有的 WinPE 工作目录
 
-`通过的方法/步骤`
+通过的方法/步骤
 
-1. 如果你已有挂载好的 WinPE 工作目录：
-   - 用新版 `winpe/scripts/` 覆盖进去
-2. 如果你还没挂载：
-   - 先进入你之前的 WinPE 工作目录
-   - 挂载 `boot.wim`
-   - 再把新版脚本覆盖到对应 `X:\scripts` 预期目录
-3. 确认 `startnet.cmd` 最终会调用新版 `agent.py`
+1. 创建工作目录：
 
-`实现什么结果`
+    copype amd64 C:\WinPE_amd64
 
-- WinPE 带上新版 agent 骨架
+2. 创建挂载目录并挂载 boot.wim：
+
+    mkdir C:\WinPE_amd64\mount
+    Dism /Mount-Image /ImageFile:C:\WinPE_amd64\media\sources\boot.wim /Index:1 /MountDir:C:\WinPE_amd64\mount
+
+3. 需要重复制作时，先备份：
+
+    copy /Y C:\WinPE_amd64\media\sources\boot.wim C:\WinPE_amd64\media\sources\boot.wim.bak
+
+实现什么结果
+
+- 得到可编辑的 C:\WinPE_amd64 工作目录。
 
 打勾：
 
-- [ ] 已覆盖新版 `agent.py`
-- [ ] 已覆盖新版 `hardware_probe.py`
-- [ ] 已覆盖新版 `spec_client.py`
-- [ ] 已覆盖新版 `run_bit.py`
-- [ ] 已确认 `startnet.cmd`
+- [x] ADK 和 WinPE Add-on 已安装
+- [x] WinPE 工作目录已创建
+- [x] boot.wim 已挂载
 
 ---
 
-## I. 重新生成并放置 `boot.wim`
+## E. 把新版脚本复制进 WinPE
 
-`在哪台机器`
+通过的方法/步骤
+
+1. 创建目标目录：
+
+    mkdir C:\WinPE_amd64\mount\scripts
+
+2. 复制仓库脚本：
+
+    xcopy /E /I /Y C:\Users\19306\Documents\自动测试\winpe\scripts C:\WinPE_amd64\mount\scripts
+
+3. 至少确认这些文件存在：
+
+    agent.py
+    hardware_probe.py
+    model_identity_rules.json
+    run_bit.py
+    spec_client.py
+    startnet.cmd
+
+4. 真正的 WinPE 启动入口不是 scripts 目录里的副本，而是：
+
+    C:\WinPE_amd64\mount\Windows\System32\startnet.cmd
+
+5. 启动入口最终调用：
+
+    X:\python\python.exe X:\scripts\agent.py
+
+实现什么结果
+
+- WinPE 中的脚本与仓库版本一致。
+- WinPE 启动后会自动执行 Agent。
+
+打勾：
+
+- [x] 脚本已复制
+- [x] 真正的 Windows\System32\startnet.cmd 已修改
+- [x] startnet.cmd 会调用 agent.py
+
+---
+
+## F. 注入 Python 和硬件探测依赖
+
+通过的方法/步骤
+
+1. 将官方 Python 3.11 amd64 embeddable package 解压到：
+
+    C:\WinPE_amd64\mount\python
+
+2. 确认至少存在：
+
+    python.exe
+    python311.dll
+    python311.zip
+    python311._pth
+
+3. 编辑 python311._pth，保留：
+
+    python311.zip
+    .
+    ..\scripts
+
+4. WinPE 基础镜像没有完整 PowerShell/CIM 能力，按依赖顺序加入以下组件，并同时加入对应的 zh-cn 语言包：
+
+    WinPE-WMI.cab
+    WinPE-NetFX.cab
+    WinPE-Scripting.cab
+    WinPE-PowerShell.cab
+
+5. hardware_probe.py 已改为调用：
+
+    X:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+
+6. 不要再依赖 wmic。WinPE 中找不到 wmic 是已确认的问题。
+
+实现什么结果
+
+- Python 能找到 scripts 下的模块。
+- Agent 能用 Get-CimInstance 读取 BIOS、CPU、内存、硬盘、网卡和串口。
+
+打勾：
+
+- [x] Python 已注入
+- [x] python311._pth 已补 scripts 路径
+- [x] PowerShell/CIM 组件已加入
+- [x] wmic 问题已通过 hardware_probe.py 修正
+
+---
+
+## G. 保存 WinPE 镜像
+
+通过的方法/步骤
+
+1. 关闭所有打开 mount 目录的窗口和编辑器。
+2. 提交并卸载：
+
+    Dism /Unmount-Image /MountDir:C:\WinPE_amd64\mount /Commit
+
+3. 如果提示目录被占用：
+   - 关闭文件管理器和编辑器
+   - 重新执行卸载
+   - 用 Dism /Get-MountedWimInfo 查看状态
+   - 确认没有需要保留的挂载后，再使用 Dism /Cleanup-Wim 清理残留
+
+4. 最终文件为：
+
+    C:\WinPE_amd64\media\sources\boot.wim
+
+实现什么结果
+
+- 得到已经包含脚本、Python 和依赖组件的新版 boot.wim。
+
+打勾：
+
+- [x] WinPE 修改已提交
+- [x] boot.wim 已生成并保存
+
+---
+
+## H. 补齐 wimboot 所需启动文件
+
+在哪台机器
 
 - Windows 开发机
 - Ubuntu 控制机
 
-`用什么工具`
+通过的方法/步骤
 
-- DISM
-- 文件管理器
-- 局域网传输或 U 盘
+将以下文件放到 Ubuntu 控制机的 /srv/http：
 
-`通过的方法/步骤`
+    boot.wim
+    bootmgr
+    BCD
+    boot.sdi
+    wimboot
 
-1. 提交 WinPE 改动并生成新的 `boot.wim`
-2. 把新的 `boot.wim` 复制到 Ubuntu 控制机：
+将 ipxe.efi 和 autoexec.ipxe 放到 /srv/tftp：
 
-```text
-/srv/http/boot.wim
-```
+    ipxe.efi
+    autoexec.ipxe
 
-3. 确认控制机文件在位：
+其中 bootmgr、BCD、boot.sdi 不能漏掉。只放 boot.wim 会导致 Windows Boot Manager 报 BCD 缺失。
 
-```bash
-find /srv/http -maxdepth 2 -type f
-```
+实现什么结果
 
-`实现什么结果`
-
-- DUT 启动时拿到的是新版 WinPE
+- 控制机具备完整的 PXE -> iPXE -> wimboot -> WinPE 文件链。
 
 打勾：
 
-- [ ] 已生成新 `boot.wim`
-- [ ] 已覆盖控制机上的 `boot.wim`
+- [x] boot.wim 已放到 /srv/http
+- [x] bootmgr 已放到 /srv/http
+- [x] BCD 已放到 /srv/http
+- [x] boot.sdi 已放到 /srv/http
+- [x] wimboot 已放到 /srv/http
+- [x] ipxe.efi 已放到 /srv/tftp
+- [x] autoexec.ipxe 已放到 /srv/tftp
 
 ---
 
-## J. 确认 PXE 主链文件仍齐全
+## I. 确认 iPXE 脚本关系
 
-`在哪台机器`
+autoexec.ipxe 负责 DHCP 和跳转：
 
-- Ubuntu 控制机
+    #!ipxe
+    echo AUTOEXEC REACHED
+    dhcp
+    echo DHCP ADDRESS: DUT_IP
+    chain http://192.168.10.1/boot.ipxe
 
-`用什么工具`
+boot.ipxe 负责加载 WinPE：
 
-- 终端
+    #!ipxe
+    kernel http://192.168.10.1/wimboot
+    initrd http://192.168.10.1/bootmgr bootmgr
+    initrd http://192.168.10.1/BCD BCD
+    initrd http://192.168.10.1/boot.sdi boot.sdi
+    initrd http://192.168.10.1/boot.wim boot.wim
+    boot
 
-`通过的方法/步骤`
-
-1. 执行：
-
-```bash
-find /srv/tftp -maxdepth 2 -type f
-find /srv/http -maxdepth 2 -type f
-```
-
-2. 重点确认：
-   - `/srv/tftp/ipxe.efi`
-   - `/srv/http/wimboot`
-   - `/srv/http/boot.wim`
-
-`实现什么结果`
-
-- PXE 启动主链文件齐全
+本次使用官网现成 ipxe.efi 和 wimboot，不依赖 WSL、make 或 gcc。
 
 打勾：
 
-- [ ] `ipxe.efi` 在位
-- [ ] `wimboot` 在位
-- [ ] `boot.wim` 在位
+- [x] DHCP 后能拿到 DUT 地址
+- [x] TFTP 能发送 ipxe.efi
+- [x] iPXE 能执行 autoexec.ipxe
+- [x] HTTP 能发送 wimboot 和 WinPE 文件
 
 ---
 
-## K. 用 1 台 DUT 做首轮真机联调
+## J. 首轮 DUT 真机联调
 
-`在哪台机器`
+通过的方法/步骤
 
-- 1 台 DUT
-- Ubuntu 控制机
+1. 控制机保持 app.py、dnsmasq、nginx 正常运行。
+2. DUT 进入 BIOS/Boot Menu。
+3. 关闭 Secure Boot，开启 UEFI PXE。
+4. 选择 PXE IPv4，不选择 HTTP IPv4。
+5. 观察 DUT 是否依次出现：
+   - DHCP 地址
+   - ipxe.efi 下载
+   - iPXE 初始化
+   - wimboot/boot.wim 下载
+   - WinPE 命令窗口
+   - Phase 1 Agent Starting
+6. 控制机可观察：
 
-`用什么工具`
+    sudo journalctl -u dnsmasq -f
+    sudo tcpdump -i eno1 'port 69 or port 80'
 
-- DUT 屏幕
-- 键盘
-- 控制机终端
+实现什么结果
 
-`通过的方法/步骤`
-
-1. 让 DUT 进入 PXE/网络启动
-2. 观察是否进入 WinPE
-3. 观察 WinPE 是否开始执行 agent
-4. 回到控制机查看：
-
-```bash
-curl http://192.168.10.1:8080/api/dashboard/summary
-```
-
-5. 如果有浏览器，打开：
-
-```text
-http://192.168.10.1:8080/dashboard
-```
-
-6. 如果能拿到 SN，再查看：
-
-```text
-http://192.168.10.1:8080/trace/你的SN
-```
-
-`实现什么结果`
-
-- 第一台 DUT 开始进入“任务注册/事件回传”联调
+- DUT 能从 PXE 进入 WinPE，并自动启动 Agent。
 
 打勾：
 
-- [ ] DUT 已进入 WinPE
-- [ ] Agent 已启动
-- [ ] 控制机看板能看到任务
+- [x] DUT 已进入 PXE
+- [x] DUT 已进入 WinPE
+- [x] Agent 已自动启动
+- [x] 控制机观察到 DUT 请求
 
 ---
 
-## L. 如果真机还没完全跑通，优先怎么看问题
+## K. 验证 Agent 和控制机已经“说上话”
 
-`在哪台机器`
+通过的方法/步骤
 
-- DUT
-- Ubuntu 控制机
+1. 查看 Controller 前台窗口，确认出现 DUT 的 healthz、注册或事件请求。
+2. 确认结果目录可以写入。
+3. DUT 运行结束后，确认 WinPE 中出现结果 JSON。
+4. WinPE 不使用 findstr 时，先执行：
 
-`用什么工具`
+    dir X:\ /s /b
 
-- 屏幕
-- 终端
+5. 找到文件后直接执行：
 
-`通过的方法/步骤`
+    type 完整路径\inventory_check_文件名.json
+    type 完整路径\final_result_文件名.json
 
-1. 如果 DUT 连 WinPE 都进不去：
-   - 先查 PXE 文件
-   - 再查 BIOS 启动项
-2. 如果 WinPE 进去了但没跑 agent：
-   - 先查 `startnet.cmd`
-   - 再查脚本是否真正被注入
-3. 如果 agent 跑了但控制机没显示任务：
-   - 先查 `app.py` 是否在运行
-   - 再查 `192.168.10.1:8080` 是否可访问
-4. 如果任务注册了但测试失败：
-   - 先看 `inventory_check`
-   - 再看 `lan_check`
-   - 最后看串口
+实现什么结果
 
-`实现什么结果`
-
-- 你知道排查顺序，不会乱查
+- Agent 完成硬件探测、任务注册和结果生成。
+- Controller 收到结果并归档。
 
 打勾：
 
-- [ ] 已明确故障排查顺序
+- [x] Agent 已读取硬件身份
+- [x] Agent 已注册任务
+- [x] Controller 已收到请求
+- [x] 结果 JSON 已生成
+- [x] 结果已归档
 
 ---
 
-## M. Day2 结束前确认
+## L. Day2 结尾状态
 
-`在哪台机器`
+截至 Day2 结束，已实际验证：
 
-- Ubuntu 控制机
-- Windows 开发机
+    PXE -> iPXE -> wimboot -> WinPE -> Python Agent -> Controller -> 结果 JSON
 
-`用什么工具`
+本次 DUT 的最终结果为：
 
-- 终端
-- 文件管理器
+    overall_result = FAIL
 
-`通过的方法/步骤`
+这个 FAIL 属于应用层测试判定，不代表主链失败。
 
-1. 确认控制机服务仍正常：
+Day2 已完成：
 
-```bash
-curl http://192.168.10.1:8080/healthz
-curl http://192.168.10.1:8080/api/dashboard/summary
-```
+- [x] 控制机基础服务正常
+- [x] 新版 Controller 已部署
+- [x] WinPE 已制作并保存
+- [x] Python 和硬件探测依赖已注入
+- [x] PXE 主链文件齐全
+- [x] 1 台 DUT 已进入 WinPE
+- [x] Agent 已自动运行
+- [x] Controller 已收到任务/事件
+- [x] 结果 JSON 已生成
+- [x] Day2 主链路完成
 
-2. 确认新版 `boot.wim` 已放到控制机
-3. 确认至少 1 台 DUT 已开始首轮联调
-4. 不要求今天必须做到：
-   - 串口全通过
-   - BurnIn 全通过
-   - MQTT/Grafana 完成
+Day2 结束时尚未完成：
 
-`实现什么结果`
+- [ ] 分析 final_result 中具体哪一项导致 FAIL
+- [ ] Dashboard 端到端展示验证
+- [ ] Trace 端到端追溯验证
+- [ ] 真实机型规格和识别规则收敛
+- [ ] 真实串口环回治具验证
+- [ ] BurnInTest 便携版、许可证和 bitcfg 注入及验证
+- [ ] 第二台 DUT 和多机并行验证
 
-- Day2 成功把项目从“只看代码”推进到“开始真机联调”
+这些项目记录为后续工作总览，本文件不展开 Day3 具体动作。
 
-打勾：
+---
 
-- [ ] 控制机服务正常
-- [ ] 新版 WinPE 已就位
-- [ ] 第一台 DUT 已开始联调
-- [ ] Day2 完成
+## M. Day2 存档结论
+
+Day2 不是“所有测试项都 PASS”，而是“第一台 DUT 已经能从 PXE 启动并把结果送回控制机”。
+
+本次已经达到 Day2 的结束标准，可以进行版本存档和 GitHub 上传。

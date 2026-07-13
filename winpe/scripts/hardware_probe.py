@@ -1,14 +1,52 @@
+import json
+import os
 import subprocess
 
 
-def run_wmic(args: list[str], timeout: int = 15) -> str:
+POWERSHELL_EXE = os.environ.get(
+    "WINPE_POWERSHELL",
+    r"X:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+)
+
+
+def run_cim_query(
+    class_name: str,
+    properties: list[str],
+    filter_expression: str = "",
+    namespace: str = "root/cimv2",
+    timeout: int = 15,
+) -> list[dict[str, object]]:
+    property_text = ", ".join(properties)
+    pipeline = f"Get-CimInstance -Namespace '{namespace}' -ClassName '{class_name}'"
+    if filter_expression:
+        pipeline += f" | Where-Object {{ {filter_expression} }}"
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        f"{pipeline} | Select-Object {property_text} | ConvertTo-Json -Compress"
+    )
     result = subprocess.run(
-        ["wmic", *args],
+        [
+            POWERSHELL_EXE,
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
         capture_output=True,
         text=True,
         timeout=timeout,
+        check=True,
     )
-    return result.stdout.strip()
+    raw = result.stdout.strip()
+    if not raw:
+        return []
+    parsed = json.loads(raw)
+    if isinstance(parsed, dict):
+        return [parsed]
+    return parsed
 
 
 def clean_lines(raw: str) -> list[str]:
@@ -40,7 +78,7 @@ def parse_csv_rows(raw: str) -> list[dict[str, str]]:
 
 
 def safe_int(raw: str, default: int = 0) -> int:
-    stripped = (raw or "").strip()
+    stripped = str(raw or "").strip()
     return int(stripped) if stripped.isdigit() else default
 
 
@@ -52,29 +90,33 @@ def safe_float(raw: str, default: float = 0.0) -> float:
 
 
 def get_identity() -> dict:
-    bios = parse_key_value_block(run_wmic(["bios", "get", "SerialNumber", "/value"]))
-    system = parse_key_value_block(
-        run_wmic(["computersystem", "get", "Manufacturer,Model", "/value"])
+    bios_rows = run_cim_query("Win32_BIOS", ["SerialNumber"])
+    system_rows = run_cim_query("Win32_ComputerSystem", ["Manufacturer", "Model"])
+    baseboard_rows = run_cim_query(
+        "Win32_BaseBoard", ["Product", "SerialNumber", "Manufacturer"]
     )
-    baseboard = parse_key_value_block(
-        run_wmic(["baseboard", "get", "Product,SerialNumber,Manufacturer", "/value"])
+    product_rows = run_cim_query(
+        "Win32_ComputerSystemProduct", ["Name", "Vendor", "IdentifyingNumber"]
     )
-    csproduct = parse_key_value_block(
-        run_wmic(["csproduct", "get", "Name,Vendor,IdentifyingNumber", "/value"])
-    )
+    bios = bios_rows[0] if bios_rows else {}
+    system = system_rows[0] if system_rows else {}
+    baseboard = baseboard_rows[0] if baseboard_rows else {}
+    csproduct = product_rows[0] if product_rows else {}
     return {
-        "bios_serial_number": bios.get("SerialNumber", "UNKNOWN"),
-        "product_name": csproduct.get("Name") or system.get("Model", "UNKNOWN"),
-        "manufacturer": csproduct.get("Vendor") or system.get("Manufacturer", "UNKNOWN"),
-        "baseboard_product": baseboard.get("Product", "UNKNOWN"),
-        "baseboard_serial": baseboard.get("SerialNumber", "UNKNOWN"),
-        "baseboard_manufacturer": baseboard.get("Manufacturer", "UNKNOWN"),
-        "identifying_number": csproduct.get("IdentifyingNumber", ""),
+        "bios_serial_number": bios.get("SerialNumber") or "UNKNOWN",
+        "product_name": csproduct.get("Name") or system.get("Model") or "UNKNOWN",
+        "manufacturer": csproduct.get("Vendor") or system.get("Manufacturer") or "UNKNOWN",
+        "baseboard_product": baseboard.get("Product") or "UNKNOWN",
+        "baseboard_serial": baseboard.get("SerialNumber") or "UNKNOWN",
+        "baseboard_manufacturer": baseboard.get("Manufacturer") or "UNKNOWN",
+        "identifying_number": csproduct.get("IdentifyingNumber") or "",
     }
 
 
 def get_cpu_info() -> dict:
-    rows = parse_csv_rows(run_wmic(["cpu", "get", "Name,NumberOfCores,Status,LoadPercentage", "/format:csv"]))
+    rows = run_cim_query(
+        "Win32_Processor", ["Name", "NumberOfCores", "Status", "LoadPercentage"]
+    )
     if not rows:
         return {
             "detected_name": "",
@@ -96,18 +138,19 @@ def get_cpu_info() -> dict:
 
 
 def get_memory_info() -> dict:
-    rows = parse_csv_rows(
-        run_wmic(["memorychip", "get", "Capacity,DeviceLocator,PartNumber,Manufacturer,Status", "/format:csv"])
+    rows = run_cim_query(
+        "Win32_PhysicalMemory",
+        ["Capacity", "DeviceLocator", "PartNumber", "Manufacturer", "Status"],
     )
     total_bytes = 0
     modules = []
     status_values = []
     vendors = set()
     for row in rows:
-        capacity_raw = row.get("Capacity", "").strip()
+        capacity_raw = str(row.get("Capacity") or "").strip()
         if capacity_raw.isdigit():
             total_bytes += int(capacity_raw)
-        vendor = row.get("Manufacturer", "").strip()
+        vendor = str(row.get("Manufacturer") or "").strip()
         if vendor:
             vendors.add(vendor)
         modules.append(
@@ -135,16 +178,18 @@ def get_memory_info() -> dict:
 
 
 def get_disk_info() -> dict:
-    rows = parse_csv_rows(run_wmic(["diskdrive", "get", "Model,Size,Status,SerialNumber", "/format:csv"]))
+    rows = run_cim_query(
+        "Win32_DiskDrive", ["Model", "Size", "Status", "SerialNumber"]
+    )
     drives = []
     statuses = []
     vendors = set()
     for row in rows:
-        model = row.get("Model", "")
-        size_raw = row.get("Size", "").strip()
+        model = str(row.get("Model") or "")
+        size_raw = str(row.get("Size") or "").strip()
         size_gb = round(int(size_raw) / (1024**3), 2) if size_raw.isdigit() else 0
-        status = row.get("Status", "") or "UNKNOWN"
-        serial_number = row.get("SerialNumber", "")
+        status = str(row.get("Status") or "UNKNOWN")
+        serial_number = str(row.get("SerialNumber") or "")
         if model:
             vendors.add(model.split(" ", 1)[0].upper())
         drives.append({"model": model, "size_gb": size_gb, "serial_number": serial_number, "status": status})
@@ -160,31 +205,25 @@ def get_disk_info() -> dict:
 
 
 def get_network_info() -> dict:
-    rows = parse_csv_rows(
-        run_wmic(
-            [
-                "nic",
-                "where",
-                "PhysicalAdapter=True",
-                "get",
-                "Name,NetConnectionStatus,Speed,MACAddress,Manufacturer,NetEnabled",
-                "/format:csv",
-            ]
-        )
+    rows = run_cim_query(
+        "Win32_NetworkAdapter",
+        ["Name", "NetConnectionStatus", "Speed", "MACAddress", "Manufacturer", "NetEnabled"],
+        filter_expression="$_.PhysicalAdapter -eq $true",
     )
     adapters = []
     for row in rows:
-        speed_raw = row.get("Speed", "").strip()
+        speed_raw = str(row.get("Speed") or "").strip()
         speed_bps = safe_int(speed_raw)
         speed_mbps = round(speed_bps / 1_000_000) if speed_bps else 0
-        link_status = row.get("NetConnectionStatus", "")
-        enabled = (row.get("NetEnabled", "") or "").upper() == "TRUE"
+        link_status = str(row.get("NetConnectionStatus") or "")
+        enabled_raw = row.get("NetEnabled")
+        enabled = enabled_raw is True or str(enabled_raw or "").upper() == "TRUE"
         is_linked = link_status == "2" or speed_mbps > 0
         adapters.append(
             {
-                "name": row.get("Name", ""),
-                "mac_address": row.get("MACAddress", ""),
-                "manufacturer": row.get("Manufacturer", ""),
+                "name": str(row.get("Name") or ""),
+                "mac_address": str(row.get("MACAddress") or ""),
+                "manufacturer": str(row.get("Manufacturer") or ""),
                 "speed_mbps": speed_mbps,
                 "net_enabled": enabled,
                 "link_status_code": link_status,
@@ -201,15 +240,17 @@ def get_network_info() -> dict:
 
 
 def get_serial_port_info() -> dict:
-    rows = parse_csv_rows(run_wmic(["path", "Win32_SerialPort", "get", "DeviceID,Description,PNPDeviceID", "/format:csv"]))
+    rows = run_cim_query(
+        "Win32_SerialPort", ["DeviceID", "Description", "PNPDeviceID"]
+    )
     ports = []
     for row in rows:
-        device_id = row.get("DeviceID", "")
+        device_id = str(row.get("DeviceID") or "")
         ports.append(
             {
                 "device_id": device_id,
-                "description": row.get("Description", ""),
-                "pnp_device_id": row.get("PNPDeviceID", ""),
+                "description": str(row.get("Description") or ""),
+                "pnp_device_id": str(row.get("PNPDeviceID") or ""),
             }
         )
     return {
@@ -224,18 +265,11 @@ def get_runtime_telemetry() -> dict:
     network = get_network_info()
     temperature_c = []
     try:
-        rows = parse_csv_rows(
-            run_wmic(
-                [
-                    "/namespace:\\\\root\\wmi",
-                    "PATH",
-                    "MSAcpi_ThermalZoneTemperature",
-                    "get",
-                    "CurrentTemperature,InstanceName",
-                    "/format:csv",
-                ],
-                timeout=10,
-            )
+        rows = run_cim_query(
+            "MSAcpi_ThermalZoneTemperature",
+            ["CurrentTemperature", "InstanceName"],
+            namespace="root/wmi",
+            timeout=10,
         )
         for row in rows:
             raw_value = safe_float(row.get("CurrentTemperature"))
